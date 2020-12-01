@@ -104,7 +104,7 @@ func TestRunsSuite(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	fixture := dns.NewFixture(&customDNSProviderSolver{httpClient: httpClient},
+	fixture := dns.NewFixture(&dynuProviderSolver{httpClient: httpClient},
 		dns.SetResolvedZone(zone),
 		dns.SetResolvedFQDN(fqdn),
 		dns.SetAllowAmbientCredentials(false),
@@ -196,7 +196,7 @@ func TestRunSuiteWithSecret(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	fixture := dns.NewFixture(&customDNSProviderSolver{httpClient: httpClient},
+	fixture := dns.NewFixture(&dynuProviderSolver{httpClient: httpClient},
 		dns.SetResolvedZone(zone),
 		dns.SetResolvedFQDN(fqdn),
 		dns.SetAllowAmbientCredentials(false),
