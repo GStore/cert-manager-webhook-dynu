@@ -1,4 +1,4 @@
-IMAGE_NAME := "gstore/cert-manager-webhook-dynu"
+IMAGE_NAME := "gunstore/cert-manager-webhook-dynu"
 IMAGE_TAG := "latest"
 
 OUT := $(shell pwd)/_out
@@ -18,3 +18,6 @@ rendered-manifest.yaml:
         --set image.repository=$(IMAGE_NAME) \
         --set image.tag=$(IMAGE_TAG) \
         deploy/cert-manager-webhook-dynu > "$(OUT)/rendered-manifest.yaml"
+
+helm-package:
+	helm package cert-manager-webhook-dynu
