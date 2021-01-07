@@ -8,8 +8,8 @@ type DNSRecord struct {
 	RecordType string `json:"recordType"`
 	TextData   string `json:"textData"`
 	TTL        string `json:"ttl"`
-	DomainID   int    `json:"domainId"`
-	State      bool   `json:"state"`
+	DomainID   int    `json:"domainId,omitempty"`
+	State      bool   `json:"state,omitempty"`
 }
 
 // DNSResponse ...
@@ -30,15 +30,37 @@ type DNSResponse struct {
 
 // DynuClient ... options for DynuClient
 type DynuClient struct {
-	HTTPClient  *http.Client
-	DNSID       string
-	DNSRecordID int
-	UserAgent   string
-	APIKey      string
+	HTTPClient *http.Client
+	HostName   string
+	UserAgent  string
+	APIKey     string
 }
 
 // DynuCreds - Details required to access API
 type DynuCreds struct {
-	APIKey string
-	DNSID  string
+	APIKey   string
+	HostName string
+}
+
+// APIException ...
+type APIException struct {
+	StatusCode int
+	Type       string
+	Message    string
+}
+
+// Domain - The Root Domain
+type Domain struct {
+	StatusCode int          `json:"statusCode"`
+	ID         int          `json:"id"`
+	Hostname   string       `json:"hostname"`
+	DomainName string       `json:"domainName"`
+	Node       string       `json:"node"`
+	Exception  APIException `json:"exception"`
+}
+
+// DNSRecords ...
+type DNSRecords struct {
+	StatusCode int           `json:"statusCode,omitempty"`
+	DNSRecords []DNSResponse `json:"dnsRecords,omitempty"`
 }

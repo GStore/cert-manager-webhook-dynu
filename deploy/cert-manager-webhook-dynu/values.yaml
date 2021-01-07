@@ -12,12 +12,12 @@ credentialsSecretRef: dynu-credentials
 
 
 certManager:
-  namespace: gitlab-managed-apps
-  serviceAccountName: certmanager-cert-manager
+  namespace: cert-manager
+  serviceAccountName: cert-manager-webhook
 
 image:
   repository: gunstore/cert-manager-webhook-dynu
-  tag: latest
+  tag: 1.1.2
   pullPolicy: IfNotPresent
 
 nameOverride: ""

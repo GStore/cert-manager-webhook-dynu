@@ -4,73 +4,129 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
+	"os"
 	"testing"
 
 	guntest "github.com/gstore/cert-manager-webhook-dynu/test"
 	"github.com/stretchr/testify/assert"
 )
 
-var i int
+var (
+	hostname = os.Getenv("DYNU_HOST_NAME")
+	apikey   = os.Getenv("DYNU_APIKEY")
+	nodeName = "txt"
+	txtData  = "123=="
+)
 
-func TestRemoveDNSRecord(t *testing.T) {
-	expectedMethod := "DELETE"
-	dnsID := "1"
-	expectedURL := fmt.Sprintf("/v2/dns/%s/record/12345", dnsID)
-
+func TestGetDomainID(t *testing.T) {
+	hostName := "example.com"
+	expectedMethod := "GET"
+	expectedURL := fmt.Sprintf("/v2/dns/getroot/%s", hostName)
 	testHandlerFunc := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		assert.Equal(t, expectedURL, req.URL.String(), "Should call %s but called %s", expectedURL, req.URL.String())
 		assert.Equal(t, expectedMethod, req.Method, "Should be %s but got %s", expectedMethod, req.Method)
 
-		w.Write([]byte("ok"))
+		w.Write([]byte(`{"statusCode": 200,"id": 12345,"domainName": "example.com","hostname": "example.com","node": ""}`))
 	})
 	client := &guntest.Testclient{}
 	httpClient, teardown := client.TestingHTTPClient(testHandlerFunc)
 	defer teardown()
 
-	dynu := DynuClient{HTTPClient: httpClient, DNSID: dnsID}
-	err := dynu.RemoveDNSRecord(12345)
+	dynu := DynuClient{HTTPClient: httpClient, HostName: hostName}
+	domainID, err := dynu.GetDomainID()
+	assert.Equal(t, 12345, domainID)
+	assert.Nil(t, err, "error returned")
+}
+
+func TestRemoveDNSRecord(t *testing.T) {
+	expectedMethod := "DELETE"
+	hostname := "example.com"
+	domainID := 98765
+	expectedURL := fmt.Sprintf("/v2/dns/%d/record/12345", domainID)
+	i := 0
+	testHandlerFunc := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		switch i {
+		case 0:
+			w.Write([]byte(`{}`))
+		case 1:
+			w.Write([]byte(fmt.Sprintf(`{"statusCode": 200,"id": %d,"domainName": "example.com","hostname": "example.com","node": ""}`, domainID)))
+		default:
+			assert.Equal(t, expectedURL, req.URL.String(), "Should call %s but called %s", expectedURL, req.URL.String())
+			assert.Equal(t, expectedMethod, req.Method, "Should be %s but got %s", expectedMethod, req.Method)
+			w.Write([]byte("ok"))
+		}
+		// if i == 0 {
+		// 	w.Write([]byte(fmt.Sprintf(`{"statusCode": 200,"id": %d,"domainName": "example.com","hostname": "example.com","node": ""}`, domainID)))
+		// } else {
+		// 	assert.Equal(t, expectedURL, req.URL.String(), "Should call %s but called %s", expectedURL, req.URL.String())
+		// 	assert.Equal(t, expectedMethod, req.Method, "Should be %s but got %s", expectedMethod, req.Method)
+		// 	w.Write([]byte("ok"))
+		// }
+		i++
+	})
+	client := &guntest.Testclient{}
+	httpClient, teardown := client.TestingHTTPClient(testHandlerFunc)
+	defer teardown()
+
+	dynu := DynuClient{HTTPClient: httpClient, HostName: hostname}
+	err := dynu.RemoveDNSRecord(nodeName, txtData)
 	assert.Nil(t, err, "error returned")
 }
 
 func TestCreateDNSRecord(t *testing.T) {
-	expectedURL := "/v2/dns/1/record"
+
 	expectedMethod := "POST"
 	expectedRecordID := 987654
-	domainID := 1
-
+	hostname := "example.com"
+	domainID := 98765
+	expectedURL := fmt.Sprintf("/v2/dns/%d/record", domainID)
+	i := 0
 	rec := DNSRecord{
-		NodeName:   "asgard",
+		NodeName:   nodeName,
 		RecordType: "TXT",
-		TextData:   "some text",
+		TextData:   txtData,
 		TTL:        "90",
 	}
 	dnsResp := DNSResponse{
 		StatusCode: 200,
 		ID:         expectedRecordID,
-		DomainID:   domainID,
 		DomainName: "domainName",
-		NodeName:   "nodeName",
+		NodeName:   nodeName,
 		Hostname:   "hostName",
 		RecordType: "TXT",
 		TTL:        90,
 		State:      true,
 		Content:    "content",
 		UpdatedOn:  "2020-10-29T23:00",
-		TextData:   "Some text",
+		TextData:   txtData,
 	}
 	dnsResponse, _ := json.Marshal(dnsResp)
 	testHandlerFunc := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, expectedURL, req.URL.String(), "Should call %s but called %s", expectedURL, req.URL.String())
-		assert.Equal(t, expectedMethod, req.Method, "Should be %s but got %s", expectedMethod, req.Method)
+		switch i {
+		case 0:
+			w.Write([]byte(fmt.Sprintf(`{"statusCode": 200,"id": %d,"domainName": "example.com","hostname": "example.com","node": ""}`, domainID)))
+		case 1:
+			w.Write([]byte(`{}`))
+		default:
+			assert.Equal(t, expectedURL, req.URL.String(), "Should call %s but called %s", expectedURL, req.URL.String())
+			assert.Equal(t, expectedMethod, req.Method, "Should be %s but got %s", expectedMethod, req.Method)
+			w.Write([]byte(dnsResponse))
+		}
 
-		w.Write([]byte(dnsResponse))
+		// if i == 0 {
+		// 	w.Write([]byte(fmt.Sprintf(`{"statusCode": 200,"id": %d,"domainName": "example.com","hostname": "example.com","node": ""}`, domainID)))
+		// } else {
+		// 	assert.Equal(t, expectedURL, req.URL.String(), "Should call %s but called %s", expectedURL, req.URL.String())
+		// 	assert.Equal(t, expectedMethod, req.Method, "Should be %s but got %s", expectedMethod, req.Method)
+		// 	w.Write([]byte(dnsResponse))
+		// }
+		i++
 	})
 
 	client := &guntest.Testclient{}
 	httpClient, teardown := client.TestingHTTPClient(testHandlerFunc)
 	defer teardown()
-	dynu := DynuClient{HTTPClient: httpClient, DNSID: strconv.Itoa(domainID)}
+	dynu := DynuClient{HTTPClient: httpClient, HostName: hostname}
 	recordID, err := dynu.CreateDNSRecord(rec)
 	if err != nil {
 		fmt.Println("an error occured: ", err.Error())
@@ -81,25 +137,30 @@ func TestCreateDNSRecord(t *testing.T) {
 }
 
 func TestAddAndRemoveRecord(t *testing.T) {
-	t.Skip("This has been intentionally skipped as it runs a test against the Live API.")
-	dnsID := 1
-	apiKey := "SomeAPIKey"
+	if hostname == "" || apikey == "" {
+		t.Skip("This has been intentionally skipped as it runs a test against the Live API.")
+	}
+
+	d := &DynuClient{HostName: hostname, APIKey: apikey}
+	domainID, err := d.GetDomainID()
+	assert.Nil(t, err)
+	assert.NotEqual(t, -1, domainID)
+	fmt.Printf("DomainID: %d", domainID)
+
 	rec := DNSRecord{
-		NodeName:   "txt",
+		NodeName:   nodeName,
 		RecordType: "TXT",
-		TextData:   "some text",
+		TextData:   txtData,
 		TTL:        "300",
-		DomainID:   1,
 		State:      true,
 	}
 
-	d := &DynuClient{DNSID: strconv.Itoa(dnsID), APIKey: apiKey}
 	dnsrecordid, err := d.CreateDNSRecord(rec)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, dnsrecordid, "DNSRecordID", dnsrecordid)
 	t.Logf("CREATED DNSRecordID: %d", dnsrecordid)
-	err = d.RemoveDNSRecord(dnsrecordid)
+	err = d.RemoveDNSRecord(nodeName, txtData)
 	assert.NoError(t, err)
 	t.Logf("Removed DNSRecordID: %d", dnsrecordid)
 }

@@ -14,10 +14,16 @@ build:
 .PHONY: rendered-manifest.yaml
 rendered-manifest.yaml:
 	helm template \
-	    --name cert-manager-webhook-dynu \
+	    cert-manager-webhook-dynu \
         --set image.repository=$(IMAGE_NAME) \
         --set image.tag=$(IMAGE_TAG) \
         deploy/cert-manager-webhook-dynu > "$(OUT)/rendered-manifest.yaml"
 
 helm-package:
-	helm package cert-manager-webhook-dynu
+	cd deploy && \
+	helm package --version $(IMAGE_TAG) cert-manager-webhook-dynu && \
+	cd ..
+
+helm-install:
+	helm uninstall cert-manager-webhook-dynu
+	helm install cert-manager-webhook-dynu ~/dev/cert-manager-webhook-dynu/deploy/cert-manager-webhook-dynu-$(IMAGE_TAG).tgz

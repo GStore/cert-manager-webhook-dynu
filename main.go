@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	// cmeta "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
 	"github.com/jetstack/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
@@ -14,6 +15,7 @@ import (
 	extapi "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog"
 
 	// "github.com/jetstack/cert-manager/pkg/issuer/acme/dns/util"
 	"github.com/gstore/cert-manager-webhook-dynu/dynuclient"
@@ -21,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const acmeNode = "ACME node"
+const acmeNode = "acme"
 
 var (
 	dnsRecordID int
@@ -83,10 +85,10 @@ type dynuProviderConfig struct {
 	//Email           string `json:"email"`
 	// APIKeySecretRef v1alpha1.SecretKeySelector `json:"apiKeySecretRef"`
 	APIKey             string                      `json:"apiKey"`
-	DomainID           string                      `json:"domainId"`
+	HostName           string                      `json:"hostName"`
 	TTL                int                         `json:"ttl"`
 	APIKeySecretKeyRef certmgrv1.SecretKeySelector `json:"apikeySecretKeyRef"`
-	DomainIDKeyRef     certmgrv1.SecretKeySelector `json:"domainidSecretKeyRef"`
+	HostNameKeyRef     certmgrv1.SecretKeySelector `json:"hostNameSecretKeyRef"`
 }
 
 // Name is used as the name for this DNS solver when referencing it on the ACME
@@ -105,23 +107,28 @@ func (c *dynuProviderSolver) Name() string {
 // cert-manager itself will later perform a self check to ensure that the
 // solver has correctly configured the DNS provider.
 func (c *dynuProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
-
 	dynu, cfg, err := c.NewDynuClient(ch)
 	if err != nil {
+		klog.Error(fmt.Sprintf("\nPresent...Err: %v\n", err))
 		return err
 	}
-	rec := dynuclient.DNSRecord{
+	nodeName := dynu.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
+	klog.Info("Present DNSName ", ch.ResolvedFQDN, " zone ", ch.ResolvedZone, " value ", ch.Key, "nodeName: ", nodeName)
 
+	rec := dynuclient.DNSRecord{
 		NodeName:   acmeNode,
 		RecordType: "TXT",
 		TextData:   ch.Key,
 		TTL:        strconv.Itoa(cfg.TTL),
+		State:      true,
 	}
 	//  &dynuclient.DynuClient{DNSID: cfg.DomainID, APIKey: cfg.APIKey, HTTPClient: c.httpClient}
 	dnsRecordID, err = dynu.CreateDNSRecord(rec)
 	if err != nil {
+		klog.Error(fmt.Sprintf("\nPresent...Err: %v\n", err))
 		return err
 	}
+	klog.Flush()
 	return nil
 }
 
@@ -134,12 +141,17 @@ func (c *dynuProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 func (c *dynuProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	dynu, _, err := c.NewDynuClient(ch)
 	if err != nil {
+		klog.Error(fmt.Sprintf("\nCleanUp...Err: %v\n", err))
 		return err
 	}
-	err = dynu.RemoveDNSRecord(dnsRecordID)
+	klog.Info("Cleanup DNSName ", ch.DNSName, "value ", ch.Key)
+	//nodeName := dynu.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
+	err = dynu.RemoveDNSRecord(acmeNode, ch.Key)
 	if err != nil {
+		klog.Error(fmt.Sprintf("\nCleanUp...Err: %v\n", err))
 		return err
 	}
+	klog.Flush()
 	return nil
 }
 
@@ -157,10 +169,11 @@ func (c *dynuProviderSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-
 	///// YOUR CUSTOM DNS PROVIDER
 	cl, err := kubernetes.NewForConfig(kubeClientConfig)
 	if err != nil {
+		klog.Error(fmt.Sprintf("\nInit...Err: %v\n", err))
 		return err
 	}
 	c.client = *cl
-
+	klog.Flush()
 	///// END OF CODE TO MAKE KUBERNETES CLIENTSET AVAILABLEuri := cfg.BaseURL + cfg.DomainId + "/" + cfg.EndPoint
 	return nil
 }
@@ -174,6 +187,7 @@ func loadConfig(cfgJSON *extapi.JSON) (dynuProviderConfig, error) {
 		return cfg, nil
 	}
 	if err := json.Unmarshal(cfgJSON.Raw, &cfg); err != nil {
+		klog.Error(fmt.Sprintf("\nInit...Err: %v\n", err))
 		return cfg, fmt.Errorf("error decoding solver config: %v", err)
 	}
 
@@ -198,17 +212,17 @@ func (c *dynuProviderSolver) getCredentials(config *dynuProviderConfig, ns strin
 		}
 	}
 
-	if config.DomainID != "" {
-		creds.DNSID = config.DomainID
+	if config.HostName != "" {
+		creds.HostName = config.HostName
 	} else {
-		secret, err := c.client.CoreV1().Secrets(ns).Get(context.Background(), config.DomainIDKeyRef.Name, metav1.GetOptions{})
+		secret, err := c.client.CoreV1().Secrets(ns).Get(context.Background(), config.HostNameKeyRef.Name, metav1.GetOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to load secret %q", ns+"/"+config.DomainIDKeyRef.Name)
+			return nil, fmt.Errorf("failed to load secret %q", ns+"/"+config.HostNameKeyRef.Name)
 		}
-		if password, ok := secret.Data[config.DomainIDKeyRef.Key]; ok {
-			creds.DNSID = string(password)
+		if password, ok := secret.Data[config.HostNameKeyRef.Key]; ok {
+			creds.HostName = string(password)
 		} else {
-			return nil, fmt.Errorf("no key %q in secret %q", config.DomainIDKeyRef, ns+"/"+config.DomainIDKeyRef.Name)
+			return nil, fmt.Errorf("no key %q in secret %q", config.HostNameKeyRef, ns+"/"+config.HostNameKeyRef.Name)
 		}
 	}
 
@@ -227,7 +241,7 @@ func (c *dynuProviderSolver) NewDynuClient(ch *v1alpha1.ChallengeRequest) (*dynu
 		return nil, &cfg, fmt.Errorf("error getting credentials: %v", err)
 	}
 
-	client := &dynuclient.DynuClient{DNSID: creds.DNSID, APIKey: creds.APIKey, HTTPClient: c.httpClient}
+	client := &dynuclient.DynuClient{HostName: creds.HostName, APIKey: creds.APIKey, HTTPClient: c.httpClient}
 
 	return client, &cfg, nil
 }
