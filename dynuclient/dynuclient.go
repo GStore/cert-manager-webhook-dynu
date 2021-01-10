@@ -16,6 +16,9 @@ import (
 
 const dynuAPI string = "https://api.dynu.com/v2"
 
+// Conformance tests fail
+const dynuRateLimit int = 5
+
 var httpClient *http.Client
 
 // CreateDNSRecord ... Create a DNS Record and return it's ID
@@ -27,12 +30,10 @@ func (c *DynuClient) CreateDNSRecord(record DNSRecord) (int, error) {
 		klog.Error(fmt.Sprintf("\n\nCreateDNSRecord...Err: %v\n", err))
 		return -1, err
 	}
-	time.Sleep(time.Duration(5) * time.Second)
 	dnsRecord, err := c.GetDNSRecord(domainID, record.NodeName, record.TextData)
 	if err == nil {
 		return dnsRecord.ID, nil
 	}
-	time.Sleep(time.Duration(5) * time.Second)
 	dnsURL := fmt.Sprintf("%s/dns/%d/record", dynuAPI, domainID)
 	body, err := json.Marshal(record)
 	if err != nil {
@@ -49,7 +50,6 @@ func (c *DynuClient) CreateDNSRecord(record DNSRecord) (int, error) {
 	}
 
 	defer resp.Body.Close()
-	time.Sleep(time.Duration(5) * time.Second)
 	if resp.StatusCode == http.StatusOK {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
@@ -90,6 +90,7 @@ func (c *DynuClient) RemoveDNSRecord(nodeName, textData string) error {
 	dnsRecord, err := c.GetDNSRecord(domainID, nodeName, textData)
 	if err != nil {
 		if strings.Contains(err.Error(), "Unable to find DNS Records") {
+			klog.Info("Couldn't find record: %v", err)
 			return nil
 		}
 		return err
@@ -112,6 +113,7 @@ func (c *DynuClient) RemoveDNSRecord(nodeName, textData string) error {
 }
 
 func (c *DynuClient) makeRequest(URL string, method string, body io.Reader) (*http.Response, error) {
+	time.Sleep(time.Duration(dynuRateLimit) * time.Second)
 	req, err := http.NewRequest(method, URL, body)
 	if err != nil {
 		return nil, err

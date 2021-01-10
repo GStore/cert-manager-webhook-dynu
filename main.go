@@ -88,7 +88,7 @@ type dynuProviderConfig struct {
 	HostName           string                      `json:"hostName"`
 	TTL                int                         `json:"ttl"`
 	APIKeySecretKeyRef certmgrv1.SecretKeySelector `json:"apikeySecretKeyRef"`
-	HostNameKeyRef     certmgrv1.SecretKeySelector `json:"hostNameSecretKeyRef"`
+	HostNameKeyRef     certmgrv1.SecretKeySelector `json:"hostnameSecretKeyRef"`
 }
 
 // Name is used as the name for this DNS solver when referencing it on the ACME
@@ -109,23 +109,23 @@ func (c *dynuProviderSolver) Name() string {
 func (c *dynuProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 	dynu, cfg, err := c.NewDynuClient(ch)
 	if err != nil {
-		klog.Error(fmt.Sprintf("\nPresent...Err: %v\n", err))
+		klog.Error(fmt.Sprintf("\n\nUnable to create dynu client\nErr: %v\n", err))
 		return err
 	}
 	nodeName := dynu.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
-	klog.Info("Present DNSName ", ch.ResolvedFQDN, " zone ", ch.ResolvedZone, " value ", ch.Key, "nodeName: ", nodeName)
+	klog.Info("\n\nPresent DNSName ", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
 
 	rec := dynuclient.DNSRecord{
-		NodeName:   acmeNode,
+		NodeName:   nodeName,
 		RecordType: "TXT",
 		TextData:   ch.Key,
 		TTL:        strconv.Itoa(cfg.TTL),
 		State:      true,
 	}
-	//  &dynuclient.DynuClient{DNSID: cfg.DomainID, APIKey: cfg.APIKey, HTTPClient: c.httpClient}
+
 	dnsRecordID, err = dynu.CreateDNSRecord(rec)
 	if err != nil {
-		klog.Error(fmt.Sprintf("\nPresent...Err: %v\n", err))
+		klog.Error(fmt.Sprintf("\n\nFailed to create DNS record\nErr: %v\n", err))
 		return err
 	}
 	klog.Flush()
@@ -141,14 +141,15 @@ func (c *dynuProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 func (c *dynuProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	dynu, _, err := c.NewDynuClient(ch)
 	if err != nil {
-		klog.Error(fmt.Sprintf("\nCleanUp...Err: %v\n", err))
+		klog.Error(fmt.Sprintf("\n\nUnable to create dynu client\nErr: %v\n", err))
 		return err
 	}
-	klog.Info("Cleanup DNSName ", ch.DNSName, "value ", ch.Key)
-	//nodeName := dynu.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
-	err = dynu.RemoveDNSRecord(acmeNode, ch.Key)
+	nodeName := dynu.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
+	klog.Info("\n\nCleanup DNSName ", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
+
+	err = dynu.RemoveDNSRecord(nodeName, ch.Key)
 	if err != nil {
-		klog.Error(fmt.Sprintf("\nCleanUp...Err: %v\n", err))
+		klog.Error(fmt.Sprintf("\n\nFailed to remove DNS record\nErr: %v\n", err))
 		return err
 	}
 	klog.Flush()
@@ -169,7 +170,7 @@ func (c *dynuProviderSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-
 	///// YOUR CUSTOM DNS PROVIDER
 	cl, err := kubernetes.NewForConfig(kubeClientConfig)
 	if err != nil {
-		klog.Error(fmt.Sprintf("\nInit...Err: %v\n", err))
+		klog.Error(fmt.Sprintf("\n\nFailed to Initialize\nErr: %v\n", err))
 		return err
 	}
 	c.client = *cl
@@ -206,7 +207,7 @@ func (c *dynuProviderSolver) getCredentials(config *dynuProviderConfig, ns strin
 			return nil, fmt.Errorf("failed to load secret %q", ns+"/"+config.APIKeySecretKeyRef.Name)
 		}
 		if apikey, ok := secret.Data[config.APIKeySecretKeyRef.Key]; ok {
-			creds.APIKey = string(apikey)
+			creds.APIKey = strings.TrimSpace(string(apikey))
 		} else {
 			return nil, fmt.Errorf("no key %q in secret %q", config.APIKeySecretKeyRef, ns+"/"+config.APIKeySecretKeyRef.Name)
 		}
@@ -219,8 +220,8 @@ func (c *dynuProviderSolver) getCredentials(config *dynuProviderConfig, ns strin
 		if err != nil {
 			return nil, fmt.Errorf("failed to load secret %q", ns+"/"+config.HostNameKeyRef.Name)
 		}
-		if password, ok := secret.Data[config.HostNameKeyRef.Key]; ok {
-			creds.HostName = string(password)
+		if hostname, ok := secret.Data[config.HostNameKeyRef.Key]; ok {
+			creds.HostName = strings.TrimSpace(string(hostname))
 		} else {
 			return nil, fmt.Errorf("no key %q in secret %q", config.HostNameKeyRef, ns+"/"+config.HostNameKeyRef.Name)
 		}
