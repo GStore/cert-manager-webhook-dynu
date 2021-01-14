@@ -6,19 +6,20 @@
 # solve the DNS01 challenge.
 # This group name should be **unique**, hence using your own company's domain
 # here is recommended.
-groupName: cert-manager-webhook-dynu.gunstore.github.com
+groupName: acme.gunstore.github.com
 
-credentialsSecretRef: dynu-credentials
-
+logLevel: 6
 
 certManager:
   namespace: cert-manager
-  serviceAccountName: cert-manager-webhook
+  serviceAccountName: cert-manager-webhook-dynu
 
 image:
-  repository: gunstore/cert-manager-webhook-dynu
-  tag: 1.1.2
+  repository: {IMAGE_NAME}
+  tag: {IMAGE_TAG}
   pullPolicy: IfNotPresent
+
+credentialsSecretRef: dynu-credentials
 
 nameOverride: ""
 fullnameOverride: ""

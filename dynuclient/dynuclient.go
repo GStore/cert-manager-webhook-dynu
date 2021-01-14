@@ -209,14 +209,6 @@ func (c *DynuClient) GetDNSRecord(domainID int, nodeName, textData string) (*DNS
 	return nil, fmt.Errorf("Unable to find DNS Records for Domain ID: %d", domainID)
 }
 
-// TrimSuffix ...
-func (c *DynuClient) TrimSuffix(s, suffix string) string {
-	if strings.HasSuffix(s, suffix) {
-		s = s[:len(s)-len(suffix)]
-	}
-	return s
-}
-
 func (c *DynuClient) logResponseBody(body []byte) {
 	_, file, no, ok := runtime.Caller(1)
 	if ok {

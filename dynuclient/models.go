@@ -38,8 +38,7 @@ type DynuClient struct {
 
 // DynuCreds - Details required to access API
 type DynuCreds struct {
-	APIKey   string
-	HostName string
+	APIKey string
 }
 
 // APIException ...

@@ -85,10 +85,8 @@ type dynuProviderConfig struct {
 	//Email           string `json:"email"`
 	// APIKeySecretRef v1alpha1.SecretKeySelector `json:"apiKeySecretRef"`
 	APIKey             string                      `json:"apiKey"`
-	HostName           string                      `json:"hostName"`
 	TTL                int                         `json:"ttl"`
 	APIKeySecretKeyRef certmgrv1.SecretKeySelector `json:"apikeySecretKeyRef"`
-	HostNameKeyRef     certmgrv1.SecretKeySelector `json:"hostnameSecretKeyRef"`
 }
 
 // Name is used as the name for this DNS solver when referencing it on the ACME
@@ -98,7 +96,7 @@ type dynuProviderConfig struct {
 // within a single webhook deployment**.
 // For example, `cloudflare` may be used as the name of a solver.
 func (c *dynuProviderSolver) Name() string {
-	return "Dynu Solver"
+	return "dynu"
 }
 
 // Present is responsible for actually presenting the DNS record with the
@@ -112,7 +110,7 @@ func (c *dynuProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		klog.Error(fmt.Sprintf("\n\nUnable to create dynu client\nErr: %v\n", err))
 		return err
 	}
-	nodeName := dynu.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
+	nodeName := strings.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
 	klog.Info("\n\nPresent DNSName ", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
 
 	rec := dynuclient.DNSRecord{
@@ -144,7 +142,7 @@ func (c *dynuProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 		klog.Error(fmt.Sprintf("\n\nUnable to create dynu client\nErr: %v\n", err))
 		return err
 	}
-	nodeName := dynu.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
+	nodeName := strings.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
 	klog.Info("\n\nCleanup DNSName ", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
 
 	err = dynu.RemoveDNSRecord(nodeName, ch.Key)
@@ -213,19 +211,19 @@ func (c *dynuProviderSolver) getCredentials(config *dynuProviderConfig, ns strin
 		}
 	}
 
-	if config.HostName != "" {
-		creds.HostName = config.HostName
-	} else {
-		secret, err := c.client.CoreV1().Secrets(ns).Get(context.Background(), config.HostNameKeyRef.Name, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to load secret %q", ns+"/"+config.HostNameKeyRef.Name)
-		}
-		if hostname, ok := secret.Data[config.HostNameKeyRef.Key]; ok {
-			creds.HostName = strings.TrimSpace(string(hostname))
-		} else {
-			return nil, fmt.Errorf("no key %q in secret %q", config.HostNameKeyRef, ns+"/"+config.HostNameKeyRef.Name)
-		}
-	}
+	// if config.HostName != "" {
+	// 	creds.HostName = config.HostName
+	// } else {
+	// 	secret, err := c.client.CoreV1().Secrets(ns).Get(context.Background(), config.HostNameKeyRef.Name, metav1.GetOptions{})
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to load secret %q", ns+"/"+config.HostNameKeyRef.Name)
+	// 	}
+	// 	if hostname, ok := secret.Data[config.HostNameKeyRef.Key]; ok {
+	// 		creds.HostName = strings.TrimSpace(string(hostname))
+	// 	} else {
+	// 		return nil, fmt.Errorf("no key %q in secret %q", config.HostNameKeyRef, ns+"/"+config.HostNameKeyRef.Name)
+	// 	}
+	// }
 
 	return &creds, nil
 }
@@ -242,7 +240,8 @@ func (c *dynuProviderSolver) NewDynuClient(ch *v1alpha1.ChallengeRequest) (*dynu
 		return nil, &cfg, fmt.Errorf("error getting credentials: %v", err)
 	}
 
-	client := &dynuclient.DynuClient{HostName: creds.HostName, APIKey: creds.APIKey, HTTPClient: c.httpClient}
+	zone := strings.TrimSuffix(ch.ResolvedZone, ".")
+	client := &dynuclient.DynuClient{HostName: zone, APIKey: creds.APIKey, HTTPClient: c.httpClient}
 
 	return client, &cfg, nil
 }

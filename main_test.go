@@ -38,6 +38,7 @@ func TestRunsSuite(t *testing.T) {
 	fixture.RunConformance(t)
 }
 func TestRunSuiteWithSecret(t *testing.T) {
+	zone = "asgard.myddns.rocks."
 	d, err := ioutil.ReadFile("testdata/config.secret.json")
 	if err != nil {
 		log.Fatal(err)
