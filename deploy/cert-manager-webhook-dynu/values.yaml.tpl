@@ -6,9 +6,10 @@
 # solve the DNS01 challenge.
 # This group name should be **unique**, hence using your own company's domain
 # here is recommended.
-groupName: acme.gunstore.github.com
+groupName: gunstore.github.com
 
-logLevel: 6
+deployment:
+  loglevel: 6
 
 certManager:
   namespace: cert-manager
