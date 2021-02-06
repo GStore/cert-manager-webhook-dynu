@@ -13,7 +13,7 @@ deployment:
 
 certManager:
   namespace: cert-manager
-  serviceAccountName: cert-manager-webhook-dynu
+  serviceAccountName: cert-manager
 
 image:
   repository: {IMAGE_NAME}

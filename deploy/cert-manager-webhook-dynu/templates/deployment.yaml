@@ -28,13 +28,13 @@ spec:
             - --tls-cert-file=/tls/tls.crt
             - --tls-private-key-file=/tls/tls.key
             - -v={{ .Values.deployment.loglevel }}
-            - --secure-port=8443
+            - --secure-port=443
           env:
             - name: GROUP_NAME
               value: {{ .Values.groupName | quote }}
           ports:
             - name: https
-              containerPort: 8443
+              containerPort: 443
               protocol: TCP
           livenessProbe:
             httpGet:

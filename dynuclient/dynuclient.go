@@ -86,11 +86,11 @@ func (c *DynuClient) RemoveDNSRecord(nodeName, textData string) error {
 	if err != nil {
 		return err
 	}
-
+	klog.Info(fmt.Sprintf("\n\nRemoveDNSRecord: \nDomainId: %d\n\n", domainID))
 	dnsRecord, err := c.GetDNSRecord(domainID, nodeName, textData)
 	if err != nil {
 		if strings.Contains(err.Error(), "Unable to find DNS Records") {
-			klog.Info("Couldn't find record: %v", err)
+			klog.Info(fmt.Sprintf("Couldn't find record: %v", err))
 			return nil
 		}
 		return err
@@ -119,6 +119,7 @@ func (c *DynuClient) makeRequest(URL string, method string, body io.Reader) (*ht
 		return nil, err
 	}
 
+	klog.Info("\n\nAPI Key: ", c.APIKey, "\n\n")
 	req.Header["accept"] = []string{"application/json"}
 	req.Header["User-Agent"] = []string{c.UserAgent}
 	req.Header["Content-Type"] = []string{"application/json"}
@@ -133,6 +134,7 @@ func (c *DynuClient) makeRequest(URL string, method string, body io.Reader) (*ht
 	return c.HTTPClient.Do(req)
 }
 
+// DecodeBytes ..
 func (c *DynuClient) decodeBytes(input []byte) (string, error) {
 
 	buf := new(strings.Builder)
@@ -148,6 +150,7 @@ func (c *DynuClient) decodeBytes(input []byte) (string, error) {
 func (c *DynuClient) GetDomainID() (int, error) {
 	dnsURL := fmt.Sprintf("%s/dns/getroot/%s", dynuAPI, c.HostName)
 
+	klog.Info("\ndnsURL: \n", dnsURL, "\n\n")
 	resp, err := c.makeRequest(dnsURL, "GET", nil)
 	if err != nil {
 		return -1, err
@@ -171,7 +174,7 @@ func (c *DynuClient) GetDomainID() (int, error) {
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	respbody, err := c.decodeBytes(bodyBytes)
 	if err == nil {
-		fmt.Printf("\nrespbody: %v\n", respbody)
+		klog.Info("\nrespbody: \n", respbody, "\n\n")
 	}
 
 	return -1, fmt.Errorf("Unable to find Domain ID \nError Type:%s\nError: %s", domain.Exception.Type, domain.Exception.Message)

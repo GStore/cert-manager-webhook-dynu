@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -110,8 +111,9 @@ func (c *dynuProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		klog.Error(fmt.Sprintf("\n\nUnable to create dynu client\nErr: %v\n", err))
 		return err
 	}
+
 	nodeName := strings.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
-	klog.Info("\n\nPresent DNSName ", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
+	klog.Info("\n\nPresent DNSName ", ch.DNSName, "\nResolvedFQDN:", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
 
 	rec := dynuclient.DNSRecord{
 		NodeName:   nodeName,
@@ -206,26 +208,15 @@ func (c *dynuProviderSolver) getCredentials(config *dynuProviderConfig, ns strin
 			return nil, fmt.Errorf("failed to load secret %q", ns+"/"+config.APIKeySecretKeyRef.Name)
 		}
 		if apikey, ok := secret.Data[config.APIKeySecretKeyRef.Key]; ok {
-			creds.APIKey = strings.TrimSpace(string(apikey))
+			decodedKey, err := b64.StdEncoding.DecodeString(strings.TrimSpace(string(apikey)))
+			if err != nil {
+				return nil, err
+			}
+			creds.APIKey = strings.TrimSpace(string(decodedKey))
 		} else {
 			return nil, fmt.Errorf("no key %q in secret %q", config.APIKeySecretKeyRef, ns+"/"+config.APIKeySecretKeyRef.Name)
 		}
 	}
-
-	// if config.HostName != "" {
-	// 	creds.HostName = config.HostName
-	// } else {
-	// 	secret, err := c.client.CoreV1().Secrets(ns).Get(context.Background(), config.HostNameKeyRef.Name, metav1.GetOptions{})
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("failed to load secret %q", ns+"/"+config.HostNameKeyRef.Name)
-	// 	}
-	// 	if hostname, ok := secret.Data[config.HostNameKeyRef.Key]; ok {
-	// 		creds.HostName = strings.TrimSpace(string(hostname))
-	// 	} else {
-	// 		return nil, fmt.Errorf("no key %q in secret %q", config.HostNameKeyRef, ns+"/"+config.HostNameKeyRef.Name)
-	// 	}
-	// }
-
 	return &creds, nil
 }
 
@@ -241,8 +232,8 @@ func (c *dynuProviderSolver) NewDynuClient(ch *v1alpha1.ChallengeRequest) (*dynu
 		return nil, &cfg, fmt.Errorf("error getting credentials: %v", err)
 	}
 
-	zone := strings.TrimSuffix(ch.ResolvedZone, ".")
-	client := &dynuclient.DynuClient{HostName: zone, APIKey: creds.APIKey, HTTPClient: c.httpClient}
+	//zone := strings.TrimSuffix(ch.ResolvedZone, ".")
+	client := &dynuclient.DynuClient{HostName: ch.DNSName, APIKey: creds.APIKey, HTTPClient: c.httpClient}
 
 	return client, &cfg, nil
 }
