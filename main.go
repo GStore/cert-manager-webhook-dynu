@@ -24,14 +24,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const acmeNode = "acme"
-
 var (
 	dnsRecordID int
+	// GroupName ...
+	GroupName = os.Getenv("GROUP_NAME")
 )
-
-// GroupName ...
-var GroupName = os.Getenv("GROUP_NAME")
 
 func main() {
 	if GroupName == "" {
@@ -112,7 +109,7 @@ func (c *dynuProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		return err
 	}
 
-	nodeName := strings.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
+	nodeName := strings.Replace(strings.Replace(ch.ResolvedFQDN, ch.DNSName, "", -1), ".", "", -1)
 	klog.Info("\n\nPresent DNSName ", ch.DNSName, "\nResolvedFQDN:", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
 
 	rec := dynuclient.DNSRecord{
@@ -144,7 +141,7 @@ func (c *dynuProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 		klog.Error(fmt.Sprintf("\n\nUnable to create dynu client\nErr: %v\n", err))
 		return err
 	}
-	nodeName := strings.TrimSuffix(strings.Replace(ch.ResolvedFQDN, ch.ResolvedZone, "", -1), ".")
+	nodeName := strings.Replace(strings.Replace(ch.ResolvedFQDN, ch.DNSName, "", -1), ".", "", -1)
 	klog.Info("\n\nCleanup DNSName ", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
 
 	err = dynu.RemoveDNSRecord(nodeName, ch.Key)

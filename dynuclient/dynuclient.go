@@ -119,7 +119,6 @@ func (c *DynuClient) makeRequest(URL string, method string, body io.Reader) (*ht
 		return nil, err
 	}
 
-	klog.Info("\n\nAPI Key: ", c.APIKey, "\n\n")
 	req.Header["accept"] = []string{"application/json"}
 	req.Header["User-Agent"] = []string{c.UserAgent}
 	req.Header["Content-Type"] = []string{"application/json"}
