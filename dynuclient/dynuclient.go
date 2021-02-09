@@ -16,7 +16,7 @@ import (
 
 const dynuAPI string = "https://api.dynu.com/v2"
 
-// Conformance tests fail
+// Control how quickly the dynu API is queried.  There may be a rate limit
 const dynuRateLimit int = 5
 
 var httpClient *http.Client

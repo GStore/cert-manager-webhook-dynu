@@ -109,7 +109,8 @@ func (c *dynuProviderSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		return err
 	}
 
-	nodeName := strings.Replace(strings.Replace(ch.ResolvedFQDN, ch.DNSName, "", -1), ".", "", -1)
+	hostname := extractHostName(ch.ResolvedFQDN, ch.ResolvedZone)
+	nodeName := strings.Replace(strings.Replace(ch.ResolvedFQDN, hostname, "", -1), ".", "", -1)
 	klog.Info("\n\nPresent DNSName ", ch.DNSName, "\nResolvedFQDN:", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
 
 	rec := dynuclient.DNSRecord{
@@ -141,7 +142,8 @@ func (c *dynuProviderSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 		klog.Error(fmt.Sprintf("\n\nUnable to create dynu client\nErr: %v\n", err))
 		return err
 	}
-	nodeName := strings.Replace(strings.Replace(ch.ResolvedFQDN, ch.DNSName, "", -1), ".", "", -1)
+	hostname := extractHostName(ch.ResolvedFQDN, ch.ResolvedZone)
+	nodeName := strings.Replace(strings.Replace(ch.ResolvedFQDN, hostname, "", -1), ".", "", -1)
 	klog.Info("\n\nCleanup DNSName ", ch.ResolvedFQDN, "\nzone ", ch.ResolvedZone, "\nnodeName: ", nodeName, "\nvalue ", ch.Key)
 
 	err = dynu.RemoveDNSRecord(nodeName, ch.Key)
@@ -193,6 +195,7 @@ func loadConfig(cfgJSON *extapi.JSON) (dynuProviderConfig, error) {
 	return cfg, nil
 }
 
+// getCredentials gets the APIKey and decodes it for later use
 func (c *dynuProviderSolver) getCredentials(config *dynuProviderConfig, ns string) (*dynuclient.DynuCreds, error) {
 
 	creds := dynuclient.DynuCreds{}
@@ -217,6 +220,13 @@ func (c *dynuProviderSolver) getCredentials(config *dynuProviderConfig, ns strin
 	return &creds, nil
 }
 
+func extractHostName(fqdn, zone string) string {
+	subdomain := strings.Replace(fqdn, zone, "", -1) // e.g. challenge.www.
+	splitSub := strings.Split(subdomain, ".")
+	hostname := splitSub[1] + "." + strings.TrimSuffix(zone, ".")
+	return hostname
+}
+
 // NewDynuClient - Create a new DynuClient
 func (c *dynuProviderSolver) NewDynuClient(ch *v1alpha1.ChallengeRequest) (*dynuclient.DynuClient, *dynuProviderConfig, error) {
 	cfg, err := loadConfig(ch.Config)
@@ -229,8 +239,9 @@ func (c *dynuProviderSolver) NewDynuClient(ch *v1alpha1.ChallengeRequest) (*dynu
 		return nil, &cfg, fmt.Errorf("error getting credentials: %v", err)
 	}
 
-	//zone := strings.TrimSuffix(ch.ResolvedZone, ".")
-	client := &dynuclient.DynuClient{HostName: ch.DNSName, APIKey: creds.APIKey, HTTPClient: c.httpClient}
+	hostname := extractHostName(ch.ResolvedFQDN, ch.ResolvedZone)
+	klog.Info(fmt.Sprintf("\n******\n\nHostName: %v\n\n******\n", hostname))
+	client := &dynuclient.DynuClient{HostName: hostname, APIKey: creds.APIKey, HTTPClient: c.httpClient}
 
 	return client, &cfg, nil
 }
