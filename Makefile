@@ -1,5 +1,5 @@
 IMAGE_NAME := gunstore/cert-manager-webhook-dynu
-IMAGE_TAG := "1.1.23"
+IMAGE_TAG := "latest"
 
 OUT := $(shell pwd)/_out
 
@@ -34,7 +34,3 @@ helm-install:
 	helm install cert-manager-webhook-dynu ~/dev/cert-manager-webhook-dynu/deploy/cert-manager-webhook-dynu-$(IMAGE_TAG).tgz
 
 deploy: build helm-package helm-install
-	    --name cert-manager-webhook-dynu \
-        --set image.repository=$(IMAGE_NAME) \
-        --set image.tag=$(IMAGE_TAG) \
-        deploy/cert-manager-webhook-dynu > "$(OUT)/rendered-manifest.yaml"
